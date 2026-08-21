@@ -1,5 +1,11 @@
 # Changelog
 
+## Next
+
+### New features
+
+- **Android**: Add `presentCaptiveSigningWithUrl` support. The URL flow now has iOS/Android parity and does not require `loginWithAccessToken`.
+
 ## 1.0.5
 
 ### New features

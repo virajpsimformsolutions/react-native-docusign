@@ -146,12 +146,33 @@ class DocuSignModule : Module() {
       }
     }
 
-    AsyncFunction("presentCaptiveSigningWithUrl") { _: CaptiveSigningUrlRecord, promise: Promise ->
-      promise.reject(
-        "not_implemented",
-        "presentCaptiveSigningWithUrl is iOS-only. On Android, use presentCaptiveSigning after login.",
-        UnsupportedOperationException("presentCaptiveSigningWithUrl is iOS-only")
-      )
+    AsyncFunction("presentCaptiveSigningWithUrl") { params: CaptiveSigningUrlRecord, promise: Promise ->
+      val activity: Activity = appContext.activityProvider?.currentActivity
+        ?: throw Exceptions.MissingActivity()
+
+      DocuSignManager.presentCaptiveSigningWithUrl(
+        activity = activity,
+        signingUrl = params.signingUrl,
+        envelopeId = params.envelopeId,
+        recipientId = params.recipientId.takeIf { it.isNotEmpty() }
+      ) { result ->
+        result.fold(
+          onSuccess = { outcome ->
+            promise.resolve(
+              mapOf(
+                "status" to outcome.status,
+                "envelopeId" to outcome.envelopeId,
+                "errorCode" to outcome.errorCode,
+                "errorMessage" to outcome.errorMessage
+              )
+            )
+          },
+          onFailure = { error ->
+            emitSigningError(params.envelopeId, "signing_failed", error.message ?: "Unknown error")
+            promise.reject("signing_failed", error.message ?: "Unknown error", error as? Exception)
+          }
+        )
+      }
     }
 
     AsyncFunction("logout") { promise: Promise ->

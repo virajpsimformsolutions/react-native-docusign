@@ -22,9 +22,7 @@ Built on the Expo Modules API. Works with Expo SDK 55+ (managed or bare with `ex
 | Flow                                                                    | iOS | Android |
 |-------------------------------------------------------------------------|:---:|:-------:|
 | Session flow: `initialize` → `loginWithAccessToken` → `presentCaptiveSigning` | ✅  |   ✅    |
-| URL flow: `presentCaptiveSigningWithUrl`                                | ✅  |   ❌    |
-
-The DocuSign Android SDK (2.1.4) does not expose a public URL-based signing entry point; calling `presentCaptiveSigningWithUrl` on Android rejects with `not_implemented`. **Default to the session flow for cross-platform apps.**
+| URL flow: `initialize` → `presentCaptiveSigningWithUrl`                 | ✅  |   ✅    |
 
 ## One backend response, both platforms
 
@@ -355,7 +353,7 @@ type SigningResult = {
 
 ### `presentCaptiveSigningWithUrl(params: CaptiveSigningUrlParams): Promise<SigningResult>`
 
-**iOS only.** Presents the DocuSign signing UI using a pre-minted recipient view URL (obtained server-side from `POST /envelopes/{id}/views/recipient`). Bypasses SDK authentication; no `initialize` / `loginWithAccessToken` required first.
+Presents the DocuSign signing UI using a pre-minted recipient view URL (obtained server-side from `POST /envelopes/{id}/views/recipient`). Bypasses SDK authentication; `initialize` is required, but `loginWithAccessToken` is not.
 
 ```ts
 type CaptiveSigningUrlParams = {
@@ -373,12 +371,12 @@ type CaptiveSigningUrlParams = {
 
 **Throws:**
 
-- `not_implemented` on Android (see [Limitations](#limitations))
+- rejects if `initialize` has not been called
 - `signing_failed` if the URL is expired, malformed, or rejected by DocuSign
 
 **Returns:** same `SigningResult` shape as `presentCaptiveSigning`.
 
-**Why this flow:** keeps the DocuSign access token out of the mobile app entirely; your backend mints the signing URL and hands that single-use credential to the client. Recommended for production iOS flows.
+**Why this flow:** keeps the DocuSign access token out of the mobile app entirely; your backend mints the signing URL and hands that single-use credential to the client. Recommended for production iOS and Android flows.
 
 ### `logout(): Promise<void>`
 
@@ -497,12 +495,12 @@ function SigningScreen() {
 - Calls `initialize()` automatically on mount (toggle with `autoInitialize: false` if you want to defer)
 - Accepts both signing flows via a discriminated union on `startSigning(session)`:
   - `{ type: 'session', ... }`: runs `loginWithAccessToken` + `presentCaptiveSigning` (iOS + Android)
-  - `{ type: 'url', ... }`: runs `presentCaptiveSigningWithUrl` (iOS only; throws on Android)
+  - `{ type: 'url', ... }`: runs `presentCaptiveSigningWithUrl` (iOS + Android, no SDK login)
 - Tracks SDK state in a finite state machine
 - Subscribes to error events and surfaces them in the `error` field
 - Cleans up event listeners on unmount
 
-### URL-flow example (iOS)
+### URL-flow example (iOS + Android)
 
 ```tsx
 const result = await startSigning({
@@ -884,7 +882,6 @@ The module uses `appContext.activityProvider.currentActivity` to get the current
 
 ## Limitations
 
-- **URL-based captive signing is iOS-only.** `presentCaptiveSigningWithUrl` is supported on iOS via DocuSign's iOS SDK 4.1.1. The DocuSign Android SDK 2.1.4 does not expose a public API that accepts a pre-minted recipient view URL, so the method throws `not_implemented` on Android. On Android, use `loginWithAccessToken` + `presentCaptiveSigning` (the session path). Your backend can branch response shape per platform.
 - **Offline signing not exposed.** DocuSign's Android SDK supports offline signing via `com.docusign:sdk-offline-signing`. This package does not currently expose offline APIs. If you need offline signing, open an issue or send a pull request.
 - **Template management not exposed.** The SDK's template caching and download APIs are not wrapped. Template creation should happen server-side via the DocuSign REST API.
 - **Custom UI not supported.** The signing UI is provided by the DocuSign SDK and cannot be customized from this package. DocuSign owns the look and feel of the signing ceremony (this is intentional for legal compliance consistency).

@@ -323,6 +323,79 @@ internal object DocuSignManager {
     }
   }
 
+  /**
+   * Presents captive signing from a pre-minted DocuSign recipient-view URL.
+   * The URL is the signing credential, so SDK initialization is required but
+   * a prior `loginWithAccessToken` call is not.
+   */
+  fun presentCaptiveSigningWithUrl(
+    activity: Activity,
+    signingUrl: String,
+    envelopeId: String,
+    recipientId: String?,
+    completion: (Result<SigningOutcome>) -> Unit
+  ) {
+    if (!isInitialized) {
+      completion(Result.failure(NotInitializedException()))
+      return
+    }
+
+    if (!pendingCompletion.compareAndSet(null, completion)) {
+      completion(Result.failure(SigningFailedException("A signing session is already in progress")))
+      return
+    }
+    currentEnvelopeId = envelopeId
+
+    try {
+      DocuSign.getInstance().getCustomSettingsDelegate()
+        .disableNativeComponentsInOnlineSigning(activity, true)
+
+      DocuSign.getInstance().getSigningDelegate().launchCaptiveSigning(
+        activity,
+        signingUrl,
+        envelopeId,
+        recipientId,
+        object : DSCaptiveSigningListener {
+          override fun onStart(envelopeId: String) {}
+
+          override fun onSuccess(envelopeId: String) {
+            handleSigningCompleted(envelopeId)
+          }
+
+          override fun onCancel(envelopeId: String, recipientId: String) {
+            handleSigningCancelled(envelopeId, null)
+          }
+
+          override fun onError(envelopeId: String?, exception: DSSigningException) {
+            handleSigningError(
+              envelopeId,
+              "signing_failed",
+              exception.message ?: "Unknown error"
+            )
+          }
+
+          override fun onRecipientSigningSuccess(envelopeId: String, recipientId: String) {}
+
+          override fun onRecipientSigningError(
+            envelopeId: String,
+            recipientId: String,
+            exception: DSSigningException
+          ) {
+            handleSigningError(
+              envelopeId,
+              "recipient_signing_failed",
+              exception.message ?: "Unknown error"
+            )
+          }
+        }
+      )
+    } catch (e: Exception) {
+      currentEnvelopeId = null
+      val pending = pendingCompletion.getAndSet(null)
+      pending?.invoke(Result.failure(SigningFailedException(e.message ?: "Unknown error")))
+    }
+  }
+
   fun handleSigningCompleted(envelopeId: String) {
     val outcome = SigningOutcome(status = "completed", envelopeId = envelopeId)
     module?.emitSigningComplete(envelopeId)
