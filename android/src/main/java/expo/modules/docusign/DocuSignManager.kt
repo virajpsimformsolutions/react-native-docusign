@@ -15,6 +15,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
+import androidx.core.net.toUri
 
 internal enum class DocuSignEnvironment(val value: String) {
   DEMO("demo"),
@@ -337,6 +338,15 @@ internal object DocuSignManager {
   ) {
     if (!isInitialized) {
       completion(Result.failure(NotInitializedException()))
+      return
+    }
+
+    val signingUri = signingUrl.toUri()
+    if (
+      !signingUri.scheme.equals("https", ignoreCase = true) ||
+      signingUri.host.isNullOrBlank()
+    ) {
+      completion(Result.failure(SigningFailedException("Signing URL must be a valid HTTPS URL")))
       return
     }
 
