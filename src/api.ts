@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 import {
   CaptiveSigningParams,
   CaptiveSigningUrlParams,
@@ -41,21 +39,11 @@ export function presentCaptiveSigning(
  * encodes recipient identity via a short-lived token. {@link initialize} is
  * still required.
  *
- * @platform iOS only. The Android DocuSign SDK (2.1.4) does not expose a
- * public URL-based signing entry point; calling this on Android rejects with
- * a clear JS error. For cross-platform parity, prefer {@link presentCaptiveSigning}
- * with the session flow (accessToken + envelopeId + recipient).
+ * Supported on iOS and Android.
  */
 export function presentCaptiveSigningWithUrl(
   params: CaptiveSigningUrlParams,
 ): Promise<SigningResult> {
-  if (Platform.OS !== 'ios') {
-    return Promise.reject(
-      new Error(
-        'presentCaptiveSigningWithUrl is iOS-only. Use presentCaptiveSigning + loginWithAccessToken for Android parity.',
-      ),
-    );
-  }
   return DocuSignModule.presentCaptiveSigningWithUrl(params);
 }
 
